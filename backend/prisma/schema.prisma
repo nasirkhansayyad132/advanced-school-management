@@ -1,0 +1,312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  ADMIN
+  PRINCIPAL
+  TEACHER
+  ACCOUNTANT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum SessionType {
+  MORNING
+  AFTERNOON
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  SICK
+}
+
+enum AttendanceEventType {
+  SUBMIT
+  EDIT
+  LOCK
+  UNLOCK
+}
+
+enum SessionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  SYNCED
+  LOCKED
+}
+
+enum GuardianRelationship {
+  FATHER
+  MOTHER
+  GUARDIAN
+  OTHER
+}
+
+// ==================== MODELS ====================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  firstName     String    @map("first_name")
+  lastName      String    @map("last_name")
+  role          UserRole
+  isActive      Boolean   @default(true) @map("is_active")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  teacher       Teacher?
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  
+  // Attendance relations
+  submittedSnapshots    AttendanceSnapshot[] @relation("SubmittedBy")
+  editedSnapshots       AttendanceSnapshot[] @relation("EditedBy")
+  lockedSnapshots       AttendanceSnapshot[] @relation("LockedBy")
+  submittedSummaries    AttendanceSessionSummary[] @relation("SummarySubmittedBy")
+  lockedSummaries       AttendanceSessionSummary[] @relation("SummaryLockedBy")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Teacher {
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  employeeId    String    @unique @map("employee_id")
+  phone         String?
+  address       String?
+  qualification String?
+  dateOfJoining DateTime? @map("date_of_joining")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classAssignments TeacherClassAssignment[]
+  attendanceEvents AttendanceEvent[]
+
+  @@index([userId])
+  @@index([employeeId])
+  @@map("teachers")
+}
+
+model Class {
+  id           String   @id @default(uuid())
+  name         String
+  section      String?
+  grade        String
+  academicYear String   @map("academic_year")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  students           Student[]
+  teacherAssignments TeacherClassAssignment[]
+  attendanceEvents   AttendanceEvent[]
+  attendanceSnapshots AttendanceSnapshot[]
+  sessionSummaries   AttendanceSessionSummary[]
+
+  @@unique([name, section, academicYear])
+  @@index([academicYear])
+  @@index([grade])
+  @@map("classes")
+}
+
+model Student {
+  id           String   @id @default(uuid())
+  admissionNo  String   @unique @map("admission_no")
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  dateOfBirth  DateTime @map("date_of_birth")
+  gender       Gender
+  classId      String   @map("class_id")
+  bloodGroup   String?  @map("blood_group")
+  address      String?
+  guardians    Json     @default("[]")
+  medicalInfo  String?  @map("medical_info")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  class               Class                @relation(fields: [classId], references: [id])
+  attendanceSnapshots AttendanceSnapshot[]
+
+  @@index([classId])
+  @@index([admissionNo])
+  @@index([firstName, lastName])
+  @@map("students")
+}
+
+model TeacherClassAssignment {
+  id        String   @id @default(uuid())
+  teacherId String   @map("teacher_id")
+  classId   String   @map("class_id")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classId])
+  @@index([teacherId])
+  @@index([classId])
+  @@map("teacher_class_assignments")
+}
+
+model AttendanceEvent {
+  id              String              @id @default(uuid())
+  idempotencyKey  String              @unique @map("idempotency_key")
+  classId         String              @map("class_id")
+  sessionType     SessionType         @map("session_type")
+  date            DateTime            @db.Date
+  teacherId       String              @map("teacher_id")
+  eventType       AttendanceEventType @map("event_type")
+  payload         Json
+  clientCreatedAt DateTime            @map("client_created_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  class   Class   @relation(fields: [classId], references: [id])
+  teacher Teacher @relation(fields: [teacherId], references: [id])
+
+  @@index([idempotencyKey])
+  @@index([classId, date, sessionType])
+  @@index([teacherId, date])
+  @@index([createdAt])
+  @@map("attendance_events")
+}
+
+model AttendanceSnapshot {
+  id               String           @id @default(uuid())
+  classId          String           @map("class_id")
+  sessionType      SessionType      @map("session_type")
+  date             DateTime         @db.Date
+  studentId        String           @map("student_id")
+  status           AttendanceStatus
+  earlyLeaveTime   DateTime?        @map("early_leave_time") @db.Time
+  earlyLeaveReason String?          @map("early_leave_reason")
+  notes            String?
+  submittedById    String?          @map("submitted_by")
+  submittedAt      DateTime?        @map("submitted_at")
+  lastEditedById   String?          @map("last_edited_by")
+  lastEditedAt     DateTime?        @map("last_edited_at")
+  isLocked         Boolean          @default(false) @map("is_locked")
+  lockedById       String?          @map("locked_by")
+  lockedAt         DateTime?        @map("locked_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  class       Class    @relation(fields: [classId], references: [id])
+  student     Student  @relation(fields: [studentId], references: [id])
+  submittedBy User?    @relation("SubmittedBy", fields: [submittedById], references: [id])
+  lastEditedBy User?   @relation("EditedBy", fields: [lastEditedById], references: [id])
+  lockedBy    User?    @relation("LockedBy", fields: [lockedById], references: [id])
+
+  @@unique([classId, sessionType, date, studentId])
+  @@index([classId, date, sessionType])
+  @@index([studentId, date])
+  @@index([status, date])
+  @@index([submittedAt])
+  @@map("attendance_snapshots")
+}
+
+model AttendanceSessionSummary {
+  id            String        @id @default(uuid())
+  classId       String        @map("class_id")
+  sessionType   SessionType   @map("session_type")
+  date          DateTime      @db.Date
+  totalStudents Int           @default(0) @map("total_students")
+  presentCount  Int           @default(0) @map("present_count")
+  absentCount   Int           @default(0) @map("absent_count")
+  lateCount     Int           @default(0) @map("late_count")
+  excusedCount  Int           @default(0) @map("excused_count")
+  sickCount     Int           @default(0) @map("sick_count")
+  status        SessionStatus @default(NOT_STARTED)
+  submittedById String?       @map("submitted_by")
+  submittedAt   DateTime?     @map("submitted_at")
+  isLocked      Boolean       @default(false) @map("is_locked")
+  lockedById    String?       @map("locked_by")
+  lockedAt      DateTime?     @map("locked_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  class       Class  @relation(fields: [classId], references: [id])
+  submittedBy User?  @relation("SummarySubmittedBy", fields: [submittedById], references: [id])
+  lockedBy    User?  @relation("SummaryLockedBy", fields: [lockedById], references: [id])
+
+  @@unique([classId, sessionType, date])
+  @@index([classId, date])
+  @@index([date])
+  @@index([status])
+  @@map("attendance_session_summaries")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  action     String
+  userId     String?  @map("user_id")
+  beforeData Json?    @map("before_data")
+  afterData  Json?    @map("after_data")
+  reason     String?
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       Json
+  description String?
+  updatedById String?  @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
