@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/hooks/useNetworkStatus.ts","./src/pages/LoginPage.tsx","./src/pages/teacher/AttendancePage.tsx","./src/pages/teacher/SyncStatusPage.tsx","./src/pages/teacher/TeacherDashboard.tsx","./src/services/api.ts","./src/services/offlineDb.ts","./src/stores/authStore.ts","./src/types/index.ts"],"version":"5.9.3"}
