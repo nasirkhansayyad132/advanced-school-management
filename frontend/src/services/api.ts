@@ -50,6 +50,143 @@ export const authApi = {
   },
 };
 
+// Students API
+export const studentsApi = {
+  getAll: async (params?: { page?: number; limit?: number; classId?: string; search?: string; isActive?: boolean }) => {
+    const response = await api.get('/students', { params });
+    return response.data;
+  },
+  getOne: async (id: string) => {
+    const response = await api.get(`/students/${id}`);
+    return response.data;
+  },
+  create: async (data: {
+    admissionNo: string;
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    gender: 'MALE' | 'FEMALE' | 'OTHER';
+    classId: string;
+    bloodGroup?: string;
+    address?: string;
+    guardians?: Array<{ name: string; phone: string; relationship: string }>;
+    medicalInfo?: string;
+  }) => {
+    const response = await api.post('/students', data);
+    return response.data;
+  },
+  update: async (id: string, data: Partial<{
+    firstName: string;
+    lastName: string;
+    dateOfBirth: string;
+    gender: 'MALE' | 'FEMALE' | 'OTHER';
+    classId: string;
+    bloodGroup: string;
+    address: string;
+    guardians: Array<{ name: string; phone: string; relationship: string }>;
+    medicalInfo: string;
+    isActive: boolean;
+  }>) => {
+    const response = await api.patch(`/students/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/students/${id}`);
+    return response.data;
+  },
+  search: async (query: string) => {
+    const response = await api.get('/students/search', { params: { q: query } });
+    return response.data;
+  },
+};
+
+// Teachers API
+export const teachersApi = {
+  getAll: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await api.get('/teachers', { params });
+    return response.data;
+  },
+  getOne: async (id: string) => {
+    const response = await api.get(`/teachers/${id}`);
+    return response.data;
+  },
+  create: async (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    employeeId: string;
+    phone?: string;
+    address?: string;
+    qualification?: string;
+    dateOfJoining?: string;
+  }) => {
+    const response = await api.post('/teachers', data);
+    return response.data;
+  },
+  update: async (id: string, data: Partial<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    address: string;
+    qualification: string;
+    isActive: boolean;
+  }>) => {
+    const response = await api.patch(`/teachers/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/teachers/${id}`);
+    return response.data;
+  },
+  getClasses: async (id: string) => {
+    const response = await api.get(`/teachers/${id}/classes`);
+    return response.data;
+  },
+  assignClass: async (id: string, data: { classId: string; isPrimary?: boolean }) => {
+    const response = await api.post(`/teachers/${id}/assignments`, data);
+    return response.data;
+  },
+};
+
+// Classes API
+export const classesApi = {
+  getAll: async (params?: { page?: number; limit?: number; academicYear?: string; isActive?: boolean }) => {
+    const response = await api.get('/classes', { params });
+    return response.data;
+  },
+  getOne: async (id: string) => {
+    const response = await api.get(`/classes/${id}`);
+    return response.data;
+  },
+  create: async (data: {
+    name: string;
+    section?: string;
+    grade: string;
+    academicYear: string;
+  }) => {
+    const response = await api.post('/classes', data);
+    return response.data;
+  },
+  update: async (id: string, data: Partial<{
+    name: string;
+    section: string;
+    grade: string;
+    isActive: boolean;
+  }>) => {
+    const response = await api.patch(`/classes/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/classes/${id}`);
+    return response.data;
+  },
+  getStudents: async (id: string) => {
+    const response = await api.get(`/classes/${id}/students`);
+    return response.data;
+  },
+};
+
 // Teacher Dashboard API
 export const teacherApi = {
   getDashboard: async (date?: string) => {
